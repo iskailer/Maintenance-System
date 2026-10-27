@@ -11,3 +11,5 @@ async function getAllEquipments(req, res){
         });
     }
 }
+
+module.exports = { getAllEquipments};

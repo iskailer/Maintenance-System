@@ -9,13 +9,16 @@ import {auth} from "./firebase.js";
 const logoutButton = document.querySelector("#logoutButton");
 const userInfo = document.querySelector("#userInfo");
 
-onAuthStateChanged(auth, (user)=>{
+onAuthStateChanged(auth, async (user)=>{
     if(!user) {
         window.location.href = "./login.html";
         return;
     }
 
     userInfo.textContent = `Usuário: ${user.email}`;
+
+    dashboardLoad();
+    await loadEquipments();
 })
 
 logoutButton.addEventListener("click", async () =>{
@@ -211,4 +214,40 @@ async function dashboardLoad() {
     };
 
 }
-dashboardLoad();
+
+
+async function loadEquipments(){
+    try {
+        const currentUser = auth.currentUser;
+        
+        if (!currentUser){
+            window.location.href = "./login.html";
+            return;
+        }
+
+        const idToken = await currentUser.getIdToken();
+
+        const response = await fetch(
+            "http://localhost:3000/equipments",
+            {
+                headers: {
+                    Authorization: "Bearer ${idToken}"
+                }
+            }
+        );
+
+        if (response.status === 401){
+            window.location.href = "./login.html";
+        }
+
+        if (!response.ok){
+            throw new Error("Falha ao carregar equipamentos.");
+        }
+
+        const equipments = await response.json();
+
+        equipmentsTableRender(equipments);
+    } catch (error) {
+        console.error("Erro ao carregar equipamentos:", error);        
+    }
+}

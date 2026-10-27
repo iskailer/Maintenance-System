@@ -26,7 +26,7 @@ loginForm.addEventListener("submit", async (event)=> {
 
     try{
         await signInWithEmailAndPassword(auth, email, password);
-        window.location.href = "./dashboard.html";
+        window.location.href = "./pages/dashboard.html";
     } catch (error){
         console.error("Falha no login", error.code);
 
@@ -47,7 +47,7 @@ registerButton.addEventListener("click", async() =>{
     try {
         await createUserWithEmailAndPassword(auth, email, password);
         feedback.textContent ="Conta criada com sucesso.";
-        window.location.href = "./dashboard.html";
+        window.location.href = "./pages/dashboard.html";
 
     } catch (error) {
         console.error("Falha no cadastro:", error.code);
