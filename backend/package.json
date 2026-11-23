@@ -4,7 +4,10 @@
   "description": "",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "prisma:generate": "prisma generate",
+    "prisma:status": "prisma migrate status"
   },
   "keywords": [],
   "author": "Iskailer I. Rodrigues",

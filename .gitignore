@@ -143,3 +143,11 @@ vite.config.ts.timestamp-*
 .vite/
 
 docs/sec
+# Credenciais do Firebase Admin (nunca versionar)
+secrets/
+serviceAccount*.json
+*firebase-adminsdk*.json
+*-credentials.json
+
+# Service account do Firebase com nome fora do padrao adminsdk
+*-firebase-*.json

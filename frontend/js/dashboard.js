@@ -1,253 +1,171 @@
-import { signOut } from 
+import { signOut, onAuthStateChanged } from 
 'https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js';
-
-import { onAuthStateChanged } from 
-'https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js';
-
 import {auth} from "./firebase.js";
+import { apiRequest } from "./api.js";
 
 const logoutButton = document.querySelector("#logoutButton");
 const userInfo = document.querySelector("#userInfo");
+const activeTotal = document.querySelector("#activesTotal");
+const preventiveTotal = document.querySelector("#preventiveTotal");
+const maintenanceEquipmentsTotal = document.querySelector("#maintenanceEquipmentsTotal");
+const equipmentsTable = document.querySelector("#equipmentsTable");
+const searchInput = document.getElementById("searchInput");
+const searchForm = document.getElementById("searchForm");
+const btnNewEquipment = document.getElementById("btnNewEquipment");
+const modalElement = document.getElementById("equipmentModal");
+const modal = new bootstrap.Modal(modalElement);
+const btnSave = document.getElementById("btnSaveEquipment");
+const equipmentName = document.getElementById("equipmentName");
+const equipmentPatrimony = document.getElementById("equipmentPatrimony");
+const pageAlert = document.getElementById("pageAlert");
+
+// Estado único da tela, alimentado pela API.
+let equipments = [];
+
+const statusLabels = {
+    active: "Ativo",
+    maintenance: "Manutenção",
+    preventive: "Preventiva",
+    inactive: "Inativo"
+};
+
+function showAlert(message) {
+    pageAlert.textContent = message;
+    pageAlert.classList.remove("d-none");
+}
+
+function hideAlert() {
+    pageAlert.textContent = "";
+    pageAlert.classList.add("d-none");
+}
+
+// Sessão inválida: encerra a sessão local e volta para o login
+// (evita loop de redirecionamento entre login e dashboard).
+async function handleApiError(error) {
+    if (error.status === 401) {
+        await signOut(auth).catch(() => {});
+        window.location.href = "../login.html";
+        return;
+    }
+    console.error("Erro na API:", error);
+    showAlert(error.message);
+}
 
 onAuthStateChanged(auth, async (user)=>{
     if(!user) {
-        window.location.href = "./login.html";
+        window.location.href = "../login.html";
         return;
     }
-
     userInfo.textContent = `Usuário: ${user.email}`;
-
-    dashboardLoad();
     await loadEquipments();
-})
+});
 
 logoutButton.addEventListener("click", async () =>{
     try {
         await signOut(auth);
-        window.location.href = "./login.html";
+        window.location.href = "../login.html";
     } catch (error) {
         console.error("Falha ao sair:",error.code);
         alert("Não foi possível encerrar a sessão. tente novamente.");
     }
 });
 
+// Calcula os indicadores a partir da lista carregada.
+function dashboardRefresh() {
+    const countByStatus = (status) =>
+        equipments.filter(equipment => equipment.status === status).length;
+    activeTotal.textContent = countByStatus("active");
+    maintenanceEquipmentsTotal.textContent = countByStatus("maintenance");
+    preventiveTotal.textContent = countByStatus("preventive");
+}
 
-
-console.log("Carregou o Dashboard =) !!!");
-
-const systemName = "Sistema de Controle de Manutenção";
-
-// let activeEquipments = 48;
-let maintenanceEquipments = 5;
-//let preventiveMaintenance = 10;
-
-console.log("Nome do sistema: " + systemName);
-console.info("Em manutenção: " + maintenanceEquipments);
-
-const equipments = [
-    { id:1,
-    name: "Compressor",
-    local: "Oficina",
-    status: "active",
-    patrimony: "12-PP"
-},{ id:2,
-    name: "Torno",
-    local: "Oficina",
-    status: "active",
-    patrimony: "1-PP"
-},{ id:3,
-    name: "Gerador",
-    local: "Casa de Maquinas",
-    status: "inactive",
-    patrimony: "65-PP"
-},{ id:4,
-    name: "Gerador Grande",
-    local: "Casa de Maquinas",
-    status: "maintenance",
-    patrimony: "70-PP"
-},{ id:5,
-    name: "Gerador Grande 5",
-    local: "Casa de Maquinas",
-    status: "maintenance",
-    patrimony: "70-PP"
-}];
-
-console.table(equipments);
-
-
-const activeTotal = document.querySelector("#activesTotal");
-const preventiveTotal = document.querySelector("#preventiveTotal");
-const maintenanceEquipmentsTotal = document.querySelector("#maintenanceEquipmentsTotal");
-const equipmentsTable = document.querySelector("#equipmentsTable");
-const searchInput = document.getElementById("searchInput");
-const btnNewEquipment = document.getElementById("btnNewEquipment");
-const modalElement = document.getElementById("equipmentModal");
-const modal = new bootstrap.Modal(modalElement);
-
-console.log("activeTotal: "+ activeTotal.textContent);
-//activeTotal.textContent = 50;
-
-// function dashboardRefresh() {
-    
-//     const actives = equipments.filter(
-//         equipment => equipment.status === "active"
-//     ).length;
-
-//     const inMaintenance = equipments.filter(
-//         equipment => equipment.status === "maintenance"
-//     ).length;
-
-//     activeTotal.textContent = actives;
-//     maintenanceEquipmentsTotal.textContent = inMaintenance;
-
-//     console.log("Dashboard atualizado");
-
-// }
-
-// dashboardRefresh();
+function createCell(text) {
+    const cell = document.createElement("td");
+    cell.textContent = text;
+    return cell;
+}
 
 function equipmentsTableRender(list) {
-    
     equipmentsTable.innerHTML = "";
-
     list.forEach(equipment => {
         const row = document.createElement("tr");
+        row.appendChild(createCell(equipment.name));
+        row.appendChild(createCell(equipment.patrimony));
+        row.appendChild(createCell(statusLabels[equipment.status] || equipment.status));
 
-        row.innerHTML = `<td>${equipment.name}</td>
-        <td>${equipment.local}</td>
-        <td>${equipment.status}</td>
-        <td>
-            <button class="btn btn-danger"
-            onclick="equipmentDelete(${equipment.id})"
-            >Excluir</button>
-        </td>`
-        
+        const actionCell = document.createElement("td");
+        const deleteButton = document.createElement("button");
+        deleteButton.className = "btn btn-danger";
+        deleteButton.textContent = "Excluir";
+        deleteButton.dataset.id = equipment.id;
+        actionCell.appendChild(deleteButton);
+        row.appendChild(actionCell);
+
         equipmentsTable.appendChild(row);
-
     });
 }
 
-equipmentsTableRender(equipments);
-
-searchInput.addEventListener("input", function () {
+function applySearchFilter() {
     const term = searchInput.value.toLowerCase();
-    
     const result = equipments.filter(equipment =>
         equipment.name.toLowerCase().includes(term));
-
     equipmentsTableRender(result);
+}
+
+searchInput.addEventListener("input", applySearchFilter);
+
+// Evita o recarregamento da página ao pesquisar.
+searchForm.addEventListener("submit", function (event) {
+    event.preventDefault();
+    applySearchFilter();
 });
 
 btnNewEquipment.addEventListener("click", function(){
     modal.show();
 });
 
-const btnSave = document.getElementById("btnSaveEquipment");
-const equipmentName = document.getElementById("equipmentName");
-
-btnSave.addEventListener("click", function(){
-    if (equipmentName.value.trim() === ""){
-        console.warn("Nome do equipamento não informado");
-        alert("Informe o nome do equipamento.");
-        return;
-    } 
-    
-    const newEquipment = {
-        id: equipments.length + 1,
-        name: equipmentName.value,
-        local: "Não Informado",
-        status: "active",
-        patrimony: `${String(equipments.length + 1).padStart(3, "0")}-PP`
-
-    }
-
-    equipments.push(newEquipment);
-    equipmentsTableRender(equipments);
-    // dashboardRefresh();
-
-
-    modal.hide();
-    equipmentName.value = "";
-})
-
-function equipmentDelete(id){
-    const index = equipments.findIndex(
-        equipment => equipment.id === id
-    );
-    
-    if(index === -1){
-        console.error("Equipamento não encontrado:", id);
+btnSave.addEventListener("click", async function(){
+    const name = equipmentName.value.trim();
+    const patrimony = equipmentPatrimony.value.trim();
+    if (name === "" || patrimony === ""){
+        alert("Informe o nome e o patrimônio do equipamento.");
         return;
     }
+    try {
+        await apiRequest("/equipments", {
+            method: "POST",
+            body: JSON.stringify({ name, patrimony, status: "active" })
+        });
+        modal.hide();
+        equipmentName.value = "";
+        equipmentPatrimony.value = "";
+        await loadEquipments();
+    } catch (error) {
+        handleApiError(error);
+    }
+});
 
-    equipments.splice(index,1);
-    equipmentsTableRender(equipments);
-    // dashboardRefresh();
-    
-    console.log("Equipamento removido",id);
-
-}
-
-async function dashboardLoad() {
-
-    try{
-        const response = await fetch("http://localhost:3000/dashboard");
-
-        if(!response.ok){
-            throw new Error("Não foi possível carregar o dashboard");
-        }
-
-        const data = await response.json();
-        console.log("Dados recebidos: ",data); 
-
-        const actives = data.activeEquips;
-        const inMaintenance = data.inMaintenance;
-        const preventiveEquips = data.preventiveMaintenance;
-            
-        activeTotal.textContent = actives;
-        maintenanceEquipmentsTotal.textContent = inMaintenance;
-        preventiveTotal.textContent = preventiveEquips;
-
-
-    } catch(error){
-        console.error("Erro ao carregar o dashboard: ", error );
-    };
-
-}
-
+// Exclusão por delegação de eventos no corpo da tabela.
+equipmentsTable.addEventListener("click", async function(event){
+    const button = event.target.closest("button[data-id]");
+    if (!button) {
+        return;
+    }
+    try {
+        await apiRequest(`/equipments/${button.dataset.id}`, { method: "DELETE" });
+        await loadEquipments();
+    } catch (error) {
+        handleApiError(error);
+    }
+});
 
 async function loadEquipments(){
     try {
-        const currentUser = auth.currentUser;
-        
-        if (!currentUser){
-            window.location.href = "./login.html";
-            return;
-        }
-
-        const idToken = await currentUser.getIdToken();
-
-        const response = await fetch(
-            "http://localhost:3000/equipments",
-            {
-                headers: {
-                    Authorization: "Bearer ${idToken}"
-                }
-            }
-        );
-
-        if (response.status === 401){
-            window.location.href = "./login.html";
-        }
-
-        if (!response.ok){
-            throw new Error("Falha ao carregar equipamentos.");
-        }
-
-        const equipments = await response.json();
-
-        equipmentsTableRender(equipments);
+        equipments = await apiRequest("/equipments");
+        hideAlert();
+        dashboardRefresh();
+        applySearchFilter();
     } catch (error) {
-        console.error("Erro ao carregar equipamentos:", error);        
+        handleApiError(error);
     }
 }
